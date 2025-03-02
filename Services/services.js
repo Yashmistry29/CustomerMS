@@ -172,6 +172,86 @@ exports.addAddress = async (req, res) => {
   
 }
 
+exports.updateCustomer = async (req, res) => {
+  try {
+    const { name, emailId, contactNo, password, dateOfBirth } = req.body;
+    const { customerId } = req.params;
+
+    if (!isValidName(name)) return res.status(400).json({ message: "Invalid Name" });
+    if (!isValidEmail(emailId)) return res.status(400).json({ message: "Invalid Email" });
+    if (!isValidAge(dateOfBirth)) return res.status(400).json({ message: "You must be at least 18 years old" });
+    if (!isValidMobile(contactNo)) return res.status(400).json({ message: "Invalid Mobile Number" });
+    // if (!isValidPassword(password)) return res.status(400).json({ message: "Invalid Password" });
+
+    const validateCustomer = await customer.findOne({ customerId }, { password: 1, emailId: 1 });
+
+    var hashedPassword = (password === validateCustomer.password) ? password : md5(password);
+
+    const updateCustomer = await customer.findOneAndUpdate({ customerId: customerId }, {
+      $set: {
+        name: name,
+        password: hashedPassword,
+        emailId: emailId,
+        contactNo: contactNo,
+        dateOfBirth: dateOfBirth
+      }
+    })
+
+    if (!updateCustomer) {
+      return res.status(400).json({ status: "error", message: "Update data is required" });
+    }
+
+    res.status(200).json({ status: "success", message: "Customer updated successfully", data: updateCustomer });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ status: "error", message: "Internal server error", error });
+  }
+}
+
+exports.updateAddress = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { addressLine1, addressLine2, addressName, area, city, pincode, state, _id } = req.body;
+
+    const data = { addressLine1, addressLine2, addressName, area, city, state, pincode, _id };
+
+    const result = await customer.findOneAndUpdate(
+      { customerId, "address._id": data._id },
+      { $set: { "address.$": data } } // Updates the matched address
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Address not found or no changes made" });
+    }
+
+    res.status(200).json({ status: "success", message: "Address updated successfully", data: result });
+  } catch (error) {
+    console.log(error)
+    res.status(500).json({ status: "error", message: "Internal server error", error });
+  }
+};
+
+exports.deleteAddress = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const { addressId } = req.body;
+
+    const result = await customer.findOneAndUpdate(
+      { customerId },
+      { $pull: { address: { _id: addressId } } } // Removes the address with matching _id
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ message: "Address not found" });
+    }
+
+    res.status(200).json({ status: "success", message: "Address deleted successfully", data: result });
+  } catch (error) {
+    res.status(500).json({ status: "error", message: "Internal server error", error });
+  }
+};
+
+
 exports.invalidRoute = (req, res) => {
   res.status(404).json({
     status: 'fail',
